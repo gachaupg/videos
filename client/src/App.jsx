@@ -5,13 +5,16 @@ import './App.css'
 import Upload from './Upload'
 import VideoPlayer from '../Videos'
 
+
+
+
 function App() {
   const [count, setCount] = useState(0)
 
   return (
     <>
       <Upload/>
-      <VideoPlayer/>
+      {/* <VideoPlayer/> */}
     </>
   )
 }

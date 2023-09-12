@@ -1,106 +1,84 @@
 import express from 'express';
-import mysql from 'mysql';
-import cors from 'cors';
 import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url'; // Import the fileURLToPath function
+import Client from 'ssh2-sftp-client';
+import cors  from "cors";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const app = express();
+const upload = multer({ dest: 'uploads/' }); // Destination folder for uploaded files
 
-const corsOptions = {
-  origin: '*', 
-  credentials: true,
-  optionSuccessStatus: 200,
+const config = {
+  host: 'rbx111.truehost.cloud',
+  port: '1624',
+  username: 'akcreativ',
+  password: 'H0h0Pu9a-[mYT8'
 };
+const corsOptions ={
+  origin:'*', 
+  credentials:true,            //access-control-allow-credentials:true
+  optionSuccessStatus:200,
+}
+
+
+// const app = express();
+
+
+app.use(cors());
+const sftp = new Client();
+
+// API endpoint for file upload
+app.post('/upload', upload.single('video'), async (req, res) => {
+  try {
+    const file = req.file; // Access the uploaded file via req.file
+
+    if (!file) {
+      return res.status(400).json({ error: 'Missing file' });
+    }
+
+    await sftp.connect(config);
+    console.log('Connected to SFTP server');
+
+    // Assuming you want to upload the file to a remote path named "remotePath"
+    await sftp.put(file.path, file.originalname);
+
+    console.log('File uploaded successfully!');
+    sftp.end(); // Close the SFTP connection
+
+    res.status(200).json({ message: 'File uploaded successfully' });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'An error occurred during file upload' });
+  }
+});
+
+
+app.get('/videos', async (req, res) => {
+  try {
+    await sftp.connect(config);
+    console.log('Connected to SFTP server');
+
+    // Get the list of files in the root directory
+    const fileList = await sftp.list('/');
+
+    const videos = fileList
+      .filter((file) => file.type === 'file' && file.name.endsWith('.mp4'))
+      .map((video) => ({
+        name: video.name,
+        url: `https://rbx111.truehost.cloud/${video.name}`,
+      }));
+
+   
+
+    const allVideos = [...videos, ...additionalVideos];
+
+    sftp.end(); // Close the SFTP connection
+    res.status(200).json(allVideos);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'An error occurred while fetching videos' });
+  }
+});
 
 const PORT = 5000;
-const app = express();
-app.use('/videos', express.static(path.join(__dirname, 'public/videos')));
-
-// Middleware
-app.use(cors(corsOptions));
-app.use(express.json());
-
-// Multer file storage configuration
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, path.join(__dirname, 'public/videos'));
-    },
-    filename: (req, file, cb) => {
-      cb(null, file.fieldname + "_" + Date.now() + path.extname(file.originalname));
-    },
-  });
-  
-  const upload = multer({ storage: storage });
-  
-  // MySQL database connection
-  const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: '',
-    database: 'peter',
-  });
-  
-  // Connect to the database
-  db.connect((err) => {
-    if (err) {
-      console.error('Database connection error:', err);
-    } else {
-      console.log('Connected to the database');
-    }
-  });
-  
-  // Serve video files as static content
-  app.use('/videos', express.static(path.join(__dirname, 'public/videos')));
-  
-  // API endpoint for file upload
-  app.post('/upload', upload.single('video'), (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
-    }
-  
-    const videoFilename = req.file.path;
-    
-    const videoPath = `${videoFilename}`; // Construct the video path relative to your server
-  console.log(videoFilename);
-    // Insert the video path into the database
-    const sql = "INSERT INTO test (file) VALUES (?)";
-  
-    db.query(sql, [videoPath], (err, result) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ message: 'Error updating database' });
-      }
-  
-      // Construct the full video URL based on your server's location
-      const fullVideoUrl = `http://your-server-domain:${PORT}${videoPath}`;
-      
-      return res.json({ Status: 'Success', videoUrl: fullVideoUrl });
-    });
-  });
-  
-
-// API endpoint for fetching video URLs
-app.get('/videos', (req, res) => {
-    const sql = 'SELECT file FROM test';
-  
-    db.query(sql, (err, results) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ message: 'Error fetching videos' });
-      }
-  
-      const videoUrls = results.map((result) => ({data:result.file}));
-      res.json(videoUrls);
-    });
-  });
-  
-  app.get('/', (req, res) => {
-    res.send('Welcome to our online shop API...');
-  });
-  
-
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

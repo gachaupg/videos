@@ -34,7 +34,7 @@ const Upload = () => {
   return (
     <div>
       <form onSubmit={handleSubmit} encType="multipart/form-data">
-        <input type="file"  accept=".mp4, .avi" name="video" onChange={handleFile} />
+        <input type="file"   onChange={handleFile} />
         <button type="submit">Upload</button>
       </form>
     </div>
